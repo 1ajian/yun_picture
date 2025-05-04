@@ -1,0 +1,45 @@
+server:
+  port: 8123
+  servlet:
+    context-path: /api
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+  profiles:
+    active: local
+
+  application:
+    name: yu-picture-backend
+  datasource:
+    url: jdbc:mysql://localhost:3306/yu_picture
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: 135564
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: false
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+  global-config:
+    db-config:
+      logic-delete-field: isDelete
+      logic-not-delete-value: 0
+      logic-delete-value: 1
+
+knife4j:
+  enable: true
+  openapi:
+    title: "接口文档"
+    description: "智能协同云图库"
+    version: 1.0
+    group:
+      default:
+        api-rule: package
+        api-rule-resources:
+          - com.yupi.yupicturebackend.controller
