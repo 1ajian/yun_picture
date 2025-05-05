@@ -43,4 +43,17 @@ public enum ImageFormatEnum {
         return null;
     }
 
+    /**
+     * 检查媒体类型是否允许
+     * @param mimeType
+     * @return
+     */
+    public static boolean checkMimeType(String mimeType) {
+        for (ImageFormatEnum imageFormatEnum : ImageFormatEnum.values()) {
+            if (imageFormatEnum.mimeType.equals(mimeType)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

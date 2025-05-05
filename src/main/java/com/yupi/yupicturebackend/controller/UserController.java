@@ -36,14 +36,19 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/user")
-@Api(tags = "用户接口")
+//@Api(tags = "用户接口")
 public class UserController {
 
     @Resource
     private UserService userService;
 
+    /**
+     * 用户注册
+     * @param userRegisterRequest
+     * @return
+     */
     @PostMapping("/register")
-    @ApiOperation(value = "用户注册")
+    //@ApiOperation(value = "用户注册")
     public BaseResponse<Long> userRegister(@RequestBody UserRegisterRequest userRegisterRequest) {
         ThrowUtils.throwIf(userRegisterRequest == null, new BusinessException(ErrorCode.PARAMS_ERROR));
 
@@ -54,8 +59,14 @@ public class UserController {
         return ResultUtils.success(res);
     }
 
+    /**
+     * 用户登录
+     * @param userLoginRequest
+     * @param request
+     * @return
+     */
     @PostMapping("/login")
-    @ApiOperation(value = "用户登录")
+    //@ApiOperation(value = "用户登录")
     public BaseResponse<LoginUserVO> userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
         ThrowUtils.throwIf(userLoginRequest == null, new BusinessException(ErrorCode.PARAMS_ERROR));
         String userAccount = userLoginRequest.getUserAccount();
@@ -65,8 +76,13 @@ public class UserController {
 
     }
 
+    /**
+     * 获取当前登录用户信息
+     * @param request
+     * @return
+     */
     @GetMapping("/get/login")
-    @ApiOperation(value = "获取当前登录用户信息")
+    //@ApiOperation(value = "获取当前登录用户信息")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<LoginUserVO> getLoginUser(HttpServletRequest request) {
         //获取登录用户信息
@@ -76,15 +92,25 @@ public class UserController {
         return ResultUtils.success(loginUserVo);
     }
 
+    /**
+     * 用户注销
+     * @param request
+     * @return
+     */
     @PostMapping("/logout")
-    @ApiOperation(value = "用户注销")
+    //@ApiOperation(value = "用户注销")
     public BaseResponse<Boolean> userLoginout(HttpServletRequest request) {
         boolean result = userService.userLogout(request);
         return ResultUtils.success(result);
     }
 
+    /**
+     * 创建用户
+     * @param userAddRequest
+     * @return
+     */
     @PostMapping("/add")
-    @ApiOperation(value = "创建用户")
+    //@ApiOperation(value = "创建用户")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Long> addUser(@RequestBody UserAddRequest userAddRequest) {
         User user = new User();
@@ -101,7 +127,12 @@ public class UserController {
     }
 
 
-    @ApiOperation(value = "根据 id 获取用户（仅管理员）")
+    /**
+     * 根据 id 获取用户（仅管理员）
+     * @param id
+     * @return
+     */
+    //@ApiOperation(value = "根据 id 获取用户（仅管理员）")
     @GetMapping("/get")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<User> getUserById(Long id) {
@@ -112,7 +143,12 @@ public class UserController {
     }
 
 
-    @ApiOperation(value = "根据 id 获取包装类UserVO")
+    /**
+     * 根据 id 获取包装类UserVO
+     * @param id
+     * @return
+     */
+    //@ApiOperation(value = "根据 id 获取包装类UserVO")
     @GetMapping("/get/vo")
     public BaseResponse<UserVO> getUserVOById(Long id) {
         BaseResponse<User> userBaseResponse = getUserById(id);
@@ -120,7 +156,12 @@ public class UserController {
         return ResultUtils.success(userService.getUserVO(user));
     }
 
-    @ApiOperation(value = "删除用户信息")
+    /**
+     * 删除用户信息
+     * @param deleteRequest
+     * @return
+     */
+    //@ApiOperation(value = "删除用户信息")
     @PostMapping("/delete")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> deleteUser(@RequestBody DeleteRequest deleteRequest) {
@@ -129,7 +170,12 @@ public class UserController {
         return ResultUtils.success(res);
     }
 
-    @ApiOperation(value = "更新用户信息")
+    /**
+     * 更新用户信息
+     * @param userUpdateRequest
+     * @return
+     */
+    //@ApiOperation(value = "更新用户信息")
     @PostMapping("/update")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateRequest userUpdateRequest) {
@@ -143,7 +189,12 @@ public class UserController {
         return ResultUtils.success(res);
     }
 
-    @ApiOperation(value = "分页获取用户封装列表（仅管理员）")
+    /**
+     * 分页获取用户封装列表（仅管理员）
+     * @param userQueryRequest
+     * @return
+     */
+    //@ApiOperation(value = "分页获取用户封装列表（仅管理员）")
     @PostMapping("/list/page/vo")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Page<UserVO>> listUserVOByPage(@RequestBody UserQueryRequest userQueryRequest) {
