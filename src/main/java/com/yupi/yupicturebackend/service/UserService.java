@@ -84,7 +84,7 @@ public interface UserService extends IService<User> {
      * @param userQueryRequest
      * @return
      */
-    LambdaQueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest);
+    QueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest);
 
     /**
      * 是否为管理员

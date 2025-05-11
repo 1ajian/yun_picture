@@ -3,9 +3,8 @@ package com.yupi.yupicturebackend.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.yupi.yupicturebackend.model.dto.picture.PictureQueryRequest;
-import com.yupi.yupicturebackend.model.dto.picture.PictureReviewRequest;
-import com.yupi.yupicturebackend.model.dto.picture.PictureUploadRequest;
+import com.yupi.yupicturebackend.common.DeleteRequest;
+import com.yupi.yupicturebackend.model.dto.picture.*;
 import com.yupi.yupicturebackend.model.entity.Picture;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yupi.yupicturebackend.model.entity.User;
@@ -13,6 +12,7 @@ import com.yupi.yupicturebackend.model.vo.PictureVO;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
 * @author 86135
@@ -22,20 +22,20 @@ import javax.servlet.http.HttpServletRequest;
 public interface PictureService extends IService<Picture> {
     /**
      * 上传图片
-     * @param multipartFile 媒体文件
+     * @param inputSource 媒体文件
      * @param pictureUploadRequest 图片上传请求
      * @param loginUser 登录用户
      * @return
      */
 
-    PictureVO uploadPicture(MultipartFile multipartFile, PictureUploadRequest pictureUploadRequest, User loginUser);
+    PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser);
 
     /**
      * 获取图片查询的queryWrapper对象
      * @param pictureQueryRequest
      * @return
      */
-    LambdaQueryWrapper<Picture> getQueryWrapper(PictureQueryRequest pictureQueryRequest);
+    QueryWrapper<Picture> getQueryWrapper(PictureQueryRequest pictureQueryRequest);
 
     /**
      * 编写获取图片封装的方法，可以为原有的图片关联创建用户的信息
@@ -60,10 +60,10 @@ public interface PictureService extends IService<Picture> {
     void validPicture(Picture picture);
 
     /**
-     * 删除云上的照片
-     * @param url
+     *  清理图片
+     * @param oldPicture
      */
-    void deleteForCos(String url);
+    void clearPictureFile(Picture oldPicture);
 
     /**
      * 图片审核
@@ -78,4 +78,44 @@ public interface PictureService extends IService<Picture> {
      * @param loginUser
      */
     void fillReviewParams(Picture picture,User loginUser);
+
+    /**
+     * 批量抓取和创建图片
+     *
+     * @param pictureUploadByBatchRequest
+     * @param loginUser
+     * @return
+     */
+    Integer uploadPictureByBatch(PictureUploadByBatchRequest pictureUploadByBatchRequest,
+                                 User loginUser);
+
+    /**
+     * 批量删除图片
+     * @param pictureIds
+     */
+    void deleteBatchPicture(List<Long> pictureIds);
+
+
+    /**
+     * 校验权限 登录用户必须是空间创建人
+     * @param loginUser
+     * @param picture
+     */
+    void checkPictureAuth(User loginUser, Picture picture);
+
+    /**
+     * 删除图片
+     * @param deleteRequest
+     * @param request
+     * @return
+     */
+    Boolean deletePicture(DeleteRequest deleteRequest, User loginUser);
+
+    /**
+     * 编辑图片
+     * @param pictureEditRequest
+     * @param loginUser
+     * @return
+     */
+    Boolean editPicture(PictureEditRequest pictureEditRequest, User loginUser);
 }

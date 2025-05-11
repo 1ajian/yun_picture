@@ -5,21 +5,18 @@ import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yupi.yupicturebackend.constant.UserConstant;
 import com.yupi.yupicturebackend.exception.BusinessException;
 import com.yupi.yupicturebackend.exception.ErrorCode;
 import com.yupi.yupicturebackend.exception.ThrowUtils;
+import com.yupi.yupicturebackend.mapper.UserMapper;
 import com.yupi.yupicturebackend.model.dto.user.UserQueryRequest;
+import com.yupi.yupicturebackend.model.entity.User;
 import com.yupi.yupicturebackend.model.vo.LoginUserVO;
 import com.yupi.yupicturebackend.model.vo.UserVO;
 import com.yupi.yupicturebackend.service.UserService;
-import com.yupi.yupicturebackend.model.entity.User;
-import com.yupi.yupicturebackend.mapper.UserMapper;
-import jdk.nashorn.internal.runtime.Context;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
@@ -227,7 +224,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return
      */
     @Override
-    public LambdaQueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest) {
+    public QueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest) {
         ThrowUtils.throwIf(userQueryRequest == null, new BusinessException(ErrorCode.PARAMS_ERROR,"请求参数对象为空"));
 
         Long id = userQueryRequest.getId();
@@ -237,13 +234,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         String userProfile = userQueryRequest.getUserProfile();
         String sortField = userQueryRequest.getSortField();
         String sortOrder = userQueryRequest.getSortOrder();
-        return new LambdaQueryWrapper<User>()
-                .eq(ObjUtil.isNotNull(id), User::getId, id)
-                .like(ObjUtil.isNotEmpty(userName), User::getUserName, userName)
-                .like(ObjUtil.isNotEmpty(userAccount), User::getUserAccount, userAccount)
-                .eq(ObjUtil.isNotEmpty(userRole), User::getUserRole, userRole)
-                .like(ObjUtil.isNotEmpty(userProfile), User::getUserProfile, userProfile)
-                .orderBy(StrUtil.isNotEmpty(sortField), "ascend".equals(sortOrder), (SFunction<User, String>) user -> sortField);
+        return new QueryWrapper<User>()
+                .eq(ObjUtil.isNotNull(id), "id", id)
+                .like(ObjUtil.isNotEmpty(userName), "userName", userName)
+                .like(ObjUtil.isNotEmpty(userAccount), "userAccount", userAccount)
+                .eq(ObjUtil.isNotEmpty(userRole), "userRole", userRole)
+                .like(ObjUtil.isNotEmpty(userProfile), "userProfile", userProfile)
+                .orderBy(StrUtil.isNotBlank(sortField),"ascend".equals(sortOrder),sortField);
     }
 
     /**

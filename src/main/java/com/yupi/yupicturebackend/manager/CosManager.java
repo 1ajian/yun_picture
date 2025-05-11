@@ -1,5 +1,7 @@
 package com.yupi.yupicturebackend.manager;
 
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.StrUtil;
 import com.qcloud.cos.COSClient;
 import com.qcloud.cos.exception.CosClientException;
 import com.qcloud.cos.model.*;
@@ -7,6 +9,7 @@ import com.qcloud.cos.model.ciModel.persistence.PicOperations;
 import com.yupi.yupicturebackend.config.CosClientConfig;
 import com.yupi.yupicturebackend.exception.BusinessException;
 import com.yupi.yupicturebackend.exception.ErrorCode;
+import com.yupi.yupicturebackend.model.entity.Picture;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -14,6 +17,10 @@ import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.Key;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * ClassName: CosManager
@@ -68,6 +75,27 @@ public class CosManager {
         PicOperations picOperations = new PicOperations();
         //表示返回原图信息
         picOperations.setIsPicInfo(1);
+
+        List<PicOperations.Rule> rules = new ArrayList<>();
+        //图片压缩为（转为webp格式）
+        String webp = FileUtil.mainName(key) + ".webp";
+        PicOperations.Rule rule = new PicOperations.Rule();
+        rule.setBucket(cosClientConfig.getBucket());
+        rule.setFileId(webp);
+        rule.setRule("imageMogr2/format/webp");
+        rules.add(rule);
+
+        //缩略图处理，对20KB的图片生成缩略图
+        if (file.length() > 2 * 1024) {
+            PicOperations.Rule thumbnailRule = new PicOperations.Rule();
+            thumbnailRule.setBucket(cosClientConfig.getBucket());
+            String thumbnailKey = FileUtil.mainName(key) + "_thumbnail." + FileUtil.getSuffix(key);
+            thumbnailRule.setFileId(thumbnailKey);
+            thumbnailRule.setRule(String.format("imageMogr2/thumbnail/%sx%s>", 1024,1024));
+            rules.add(thumbnailRule);
+        }
+
+        picOperations.setRules(rules);
         putObjectRequest.setPicOperations(picOperations);
         //存储对象
         return cosClient.putObject(putObjectRequest);
@@ -103,13 +131,52 @@ public class CosManager {
 
     /**
      * 从云上删除图片对象
-     * @param key
+     * @param url
      */
-    public void deleteForCos(String key) {
+    public void deleteForCos(String url) {
         try {
-            cosClient.deleteObject(cosClientConfig.getBucket(),key);
+            if (StrUtil.isNotBlank(url)) {
+                String key = url.replace(cosClientConfig.getHost(), "");
+                cosClient.deleteObject(cosClientConfig.getBucket(),key);
+            }
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR,"腾讯云上对象删除失败");
+        }
+    }
+
+
+    /**
+     * 云上批量删除图片
+     * @param pictures
+     */
+    public void deleteBatchPicture(List<Picture> pictures) {
+        List<String> urls = pictures.stream().map(picture -> picture.getUrl().replace(cosClientConfig.getHost() + "/", "")).collect(Collectors.toList());
+        List<String> thumbnailUrls = pictures.stream().map(picture -> picture.getThumbnailUrl().replace(cosClientConfig.getHost() + "/", "")).collect(Collectors.toList());
+        List<String> originalUrls = pictures.stream().map(picture -> picture.getOriginalUrl().replace(cosClientConfig.getHost() + "/", "")).collect(Collectors.toList());
+        DeleteObjectsRequest deleteObjectsRequest = new DeleteObjectsRequest(cosClientConfig.getBucket());
+
+        //设置要删除Key的列表
+        ArrayList<DeleteObjectsRequest.KeyVersion> keyList = new ArrayList<>();
+        for (String url : urls) {
+            keyList.add(new DeleteObjectsRequest.KeyVersion(url));
+        }
+
+        for (String thumbnailUrl : thumbnailUrls) {
+            keyList.add(new DeleteObjectsRequest.KeyVersion(thumbnailUrl));
+        }
+
+        for (String originalUrl : originalUrls) {
+            keyList.add(new DeleteObjectsRequest.KeyVersion(originalUrl));
+        }
+
+        deleteObjectsRequest.setKeys(keyList);
+
+        try {
+            cosClient.deleteObjects(deleteObjectsRequest);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "删除失败");
+        } finally {
+            cosClient.shutdown();
         }
     }
 }

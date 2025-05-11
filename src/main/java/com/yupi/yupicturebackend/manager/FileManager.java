@@ -3,6 +3,7 @@ package com.yupi.yupicturebackend.manager;
 import cn.hutool.core.date.DateUnit;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpResponse;
 import cn.hutool.http.HttpStatus;
@@ -41,6 +42,7 @@ import java.util.*;
  */
 @Service
 @Slf4j
+@Deprecated
 public class FileManager {
     @Resource
     private CosClientConfig cosClientConfig;
@@ -215,19 +217,19 @@ public class FileManager {
      */
     public void validPicture(String fileUrl) {
         ThrowUtils.throwIf(StrUtil.isBlank(fileUrl),ErrorCode.PARAMS_ERROR,"文件地址不能为空");
-        //验证url格式
+        //1.验证url格式
         try {
             new URL(fileUrl);
         } catch (MalformedURLException e) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"文件地址格式不正确");
         }
-        //校验url协议
+        //2.校验url协议
         ThrowUtils.throwIf(!(fileUrl.startsWith("http://") || fileUrl.startsWith("https://")),
                 ErrorCode.PARAMS_ERROR,"仅支持HTTP或HTTPS协议的文件地址");
 
         HttpResponse response = null;
         try {
-            //发送HEAD请求验证文件是否存在
+            //3.发送HEAD请求验证文件是否存在
             response = HttpUtil.createRequest(Method.HEAD, fileUrl).execute();
             if (response.getStatus() != HttpStatus.HTTP_OK) {
                 return;
@@ -237,8 +239,8 @@ public class FileManager {
             //校验文件类型
             String contentType = response.header("Content-Type");
             if (StrUtil.isNotBlank(contentType)) {
-                boolean checkResult = ImageFormatEnum.checkMimeType(contentType);
-                ThrowUtils.throwIf(!checkResult,ErrorCode.PARAMS_ERROR,"文件的类型不被允许");
+                ImageFormatEnum imageFormatEnum = ImageFormatEnum.checkMimeType(contentType);
+                ThrowUtils.throwIf(ObjUtil.isNull(imageFormatEnum),ErrorCode.PARAMS_ERROR,"文件的类型不被允许");
             }
 
             //校验文件大小

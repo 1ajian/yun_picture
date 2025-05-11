@@ -99,7 +99,7 @@ public class UserController {
      */
     @PostMapping("/logout")
     //@ApiOperation(value = "用户注销")
-    public BaseResponse<Boolean> userLoginout(HttpServletRequest request) {
+    public BaseResponse<Boolean> logout(HttpServletRequest request) {
         boolean result = userService.userLogout(request);
         return ResultUtils.success(result);
     }

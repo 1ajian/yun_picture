@@ -2,11 +2,21 @@ server:
   port: 8123
   servlet:
     context-path: /api
+    # cookie 30 天过期
+    session:
+      cookie:
+        max-age: 259200
 
 spring:
+  # session配置
+  session:
+    store-type: redis
+    # session 30天过期
+    timeout: 259200
   servlet:
     multipart:
       max-file-size: 10MB
+
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: GMT+8
@@ -20,6 +30,12 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
     password: 135564
+
+  redis:
+    database: 0
+    host: 127.0.0.1
+    port: 6379
+    timeout: 5000
 
 mybatis-plus:
   configuration:

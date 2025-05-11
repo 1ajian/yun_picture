@@ -3,7 +3,6 @@ package com.yupi.yupicturebackend.model.vo;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
 import com.yupi.yupicturebackend.model.entity.Picture;
-import jdk.nashorn.internal.objects.NativeUint8Array;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -30,6 +29,12 @@ public class PictureVO implements Serializable {
      * 图片 url
      */
     private String url;
+
+    /**
+     * 缩略图 url
+     */
+    private String thumbnailUrl;
+
 
     /**
      * 图片名称
@@ -100,6 +105,12 @@ public class PictureVO implements Serializable {
      * 创建用户信息
      */
     private UserVO user;
+
+    /**
+     * 空间 id
+     */
+    private Long spaceId;
+
 
     private static final long serialVersionUID = 1L;
 

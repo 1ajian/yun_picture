@@ -5,10 +5,16 @@ import com.qcloud.cos.ClientConfig;
 import com.qcloud.cos.auth.BasicCOSCredentials;
 import com.qcloud.cos.auth.COSCredentials;
 import com.qcloud.cos.region.Region;
+import com.qcloud.cos.transfer.TransferManager;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import javax.annotation.Resource;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * ClassName: CosClientConfig
@@ -48,6 +54,7 @@ public class CosClientConfig {
      */
     private String bucket;
 
+
     /**
      * 创建cosclient实例，这个实例用来后续调用请求
      * @return
@@ -63,4 +70,5 @@ public class CosClientConfig {
         //创建并返回COS客户端
         return new COSClient(cred, clientConfig);
     }
+
 }
