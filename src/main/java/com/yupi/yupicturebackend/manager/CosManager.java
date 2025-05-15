@@ -1,10 +1,15 @@
 package com.yupi.yupicturebackend.manager;
 
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.CharsetUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
 import com.qcloud.cos.COSClient;
 import com.qcloud.cos.exception.CosClientException;
 import com.qcloud.cos.model.*;
+import com.qcloud.cos.model.ciModel.image.ImageLabelRequest;
+import com.qcloud.cos.model.ciModel.image.ImageLabelResponse;
+import com.qcloud.cos.model.ciModel.image.Label;
 import com.qcloud.cos.model.ciModel.persistence.PicOperations;
 import com.yupi.yupicturebackend.config.CosClientConfig;
 import com.yupi.yupicturebackend.exception.BusinessException;
@@ -14,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,6 +44,21 @@ public class CosManager {
 
     @Resource
     private CosClientConfig cosClientConfig;
+
+    /**
+     * 获取图片的标签
+     * @param key
+     */
+    public ImageLabelResponse getPictureTags(String key) {
+        //1.创建任务请求对象
+        ImageLabelRequest request = new ImageLabelRequest();
+        //2.添加请求参数 参数详情请见 API 接口文档
+        request.setBucketName(cosClientConfig.getBucket());
+        request.setObjectKey(key);
+        //3.调用接口,获取任务响应对象
+        ImageLabelResponse response = cosClient.getImageLabel(request);
+        return response;
+    }
 
     /**
      * 上传对象
@@ -99,6 +120,43 @@ public class CosManager {
         putObjectRequest.setPicOperations(picOperations);
         //存储对象
         return cosClient.putObject(putObjectRequest);
+    }
+
+    /**
+     * 获取主色调
+     * @param key
+     * @return
+     */
+    public String getImageAve(String key) {
+        GetObjectRequest getObj = new GetObjectRequest(cosClientConfig.getBucket(), key);
+        String rule = "imageAve";
+        getObj.putCustomQueryParameter(rule, null);
+        ByteArrayOutputStream result = null;
+        try {
+            COSObject object = cosClient.getObject(getObj);
+            COSObjectInputStream objectContent = object.getObjectContent();
+            result = new ByteArrayOutputStream();
+            byte[] buffer = new byte[1024];
+            int length;
+            while ((length = objectContent.read(buffer)) != -1) {
+                result.write(buffer, 0,length);
+            }
+
+            String aveColor = result.toString(CharsetUtil.UTF_8);
+            return new JSONObject(aveColor).getStr("RGB");
+
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR,"图片主色调失败");
+        } finally {
+            if (result != null) {
+                try {
+                    result.close();
+                } catch (IOException e) {
+                    throw new BusinessException(ErrorCode.SYSTEM_ERROR,"流关闭失败");
+                }
+            }
+        }
+
     }
 
     /**
@@ -179,4 +237,5 @@ public class CosManager {
             cosClient.shutdown();
         }
     }
+
 }

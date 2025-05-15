@@ -8,6 +8,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yupi.yupicturebackend.annotation.AuthCheck;
+import com.yupi.yupicturebackend.api.aliyunai.AliYunAiApi;
+import com.yupi.yupicturebackend.api.aliyunai.model.CreateOutPaintingTaskRequest;
+import com.yupi.yupicturebackend.api.aliyunai.model.CreateOutPaintingTaskResponse;
+import com.yupi.yupicturebackend.api.aliyunai.model.GetOutPaintingTaskResponse;
+import com.yupi.yupicturebackend.api.imagesearch.ImageSearchApiFacade;
+import com.yupi.yupicturebackend.api.imagesearch.model.ImageSearchResult;
 import com.yupi.yupicturebackend.common.BaseResponse;
 import com.yupi.yupicturebackend.common.DeleteRequest;
 import com.yupi.yupicturebackend.common.ResultUtils;
@@ -55,7 +61,6 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 //@Api(tags = "图片接口")
 public class PictureController {
-
     @Resource
     private UserService userService;
 
@@ -67,6 +72,9 @@ public class PictureController {
 
     @Resource
     private SpaceService spaceService;
+
+    @Resource
+    private AliYunAiApi aliYunAiApi;
 
     /**
      * 本地缓存 Caffeine
@@ -415,5 +423,91 @@ public class PictureController {
     public BaseResponse<Boolean> deleteBatchPicture(@RequestParam List<Long> pictureIds) {
         pictureService.deleteBatchPicture(pictureIds);
         return ResultUtils.success(true);
+    }
+
+    /**
+     * 以图搜图
+     * @param request
+     * @return
+     */
+    @PostMapping("/search/picture")
+    public BaseResponse<List<ImageSearchResult>> searchPictureByPicture(@RequestBody SearchPictureByPictureRequest request) {
+        //先判空
+        ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
+        Long pictureId = request.getPictureId();
+        ThrowUtils.throwIf(pictureId == null || pictureId <= 0, ErrorCode.PARAMS_ERROR);
+        //查询原图是否存在
+        Picture oldPicture = pictureService.getById(pictureId);
+        ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
+        //调用接口方法
+        String originalUrl = oldPicture.getOriginalUrl();
+        List<ImageSearchResult> imageSearchResults = ImageSearchApiFacade.searchImage(originalUrl);
+        //返回
+        return ResultUtils.success(imageSearchResults);
+    }
+
+    /**
+     * 颜色搜索
+     * @param searchPictureByColorRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/search/color")
+    public BaseResponse<List<PictureVO>> searchPictureByColor(@RequestBody SearchPictureByColorRequest searchPictureByColorRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(searchPictureByColorRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        String picColor = searchPictureByColorRequest.getPicColor();
+        Long spaceId = searchPictureByColorRequest.getSpaceId();
+        List<PictureVO> pictureVOList = pictureService.searchPictureByColor(spaceId, picColor, loginUser);
+        return ResultUtils.success(pictureVOList);
+    }
+
+    /**
+     * 修改我的空间内图片的所有主色调（仅我自己使用）
+     * @return
+     */
+    @PostMapping("/changeAllAve")
+    public BaseResponse<Boolean> updateAllAve(Long spaceId) {
+        pictureService.updateAllAve(spaceId);
+        return ResultUtils.success(true);
+    }
+
+    /**
+     * 批量编辑图片信息
+     * @param pictureEditByBatchRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/edit/batch")
+    public BaseResponse<Boolean> editPictureByBatch(@RequestBody PictureEditByBatchRequest pictureEditByBatchRequest,HttpServletRequest request) {
+        ThrowUtils.throwIf(pictureEditByBatchRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        pictureService.editPictureByBatch(pictureEditByBatchRequest, loginUser);
+        return ResultUtils.success(true);
+    }
+
+    /**
+     * 创建扩图任务
+     * @param request
+     * @return
+     */
+    @PostMapping("/out_painting/create_task")
+    public BaseResponse<CreateOutPaintingTaskResponse> createOutPaintingTask(@RequestBody CreatePictureOutPaintingTaskRequest request,HttpServletRequest httpServletRequest) {
+        ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(httpServletRequest);
+        CreateOutPaintingTaskResponse response = pictureService.createPictureOutPaintingTask(request, loginUser);
+        return ResultUtils.success(response);
+    }
+
+    /**
+     * 查询 AI 扩图任务
+     * @param taskId
+     * @return
+     */
+    @GetMapping("/out_painting/get_task")
+    public BaseResponse<GetOutPaintingTaskResponse> getOutPaintingTaskResponse(String taskId) {
+        ThrowUtils.throwIf(taskId == null, ErrorCode.PARAMS_ERROR);
+        GetOutPaintingTaskResponse response = aliYunAiApi.getOutPaintingTask(taskId);
+        return ResultUtils.success(response);
     }
 }

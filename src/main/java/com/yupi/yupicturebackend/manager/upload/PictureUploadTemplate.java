@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import com.qcloud.cos.model.PutObjectResult;
+import com.qcloud.cos.model.ciModel.image.ImageLabelResponse;
 import com.qcloud.cos.model.ciModel.persistence.CIObject;
 import com.qcloud.cos.model.ciModel.persistence.ImageInfo;
 import com.qcloud.cos.model.ciModel.persistence.ProcessResults;
@@ -124,11 +125,17 @@ public abstract class PictureUploadTemplate {
         uploadPictureResult.setOriginalUrl(cosClientConfig.getHost() + uploadPath);
         uploadPictureResult.setPicName(FileUtil.mainName(uploadFileName));
         uploadPictureResult.setPicSize(file.length());
+
+        //获取生成的标签结果集对象
+        ImageLabelResponse imageLabelResponse = cosManager.getPictureTags(uploadPath);
+        uploadPictureResult.setPictureTagsResponse(imageLabelResponse);
+
         /*uploadPictureResult.setPicWidth(width);
         uploadPictureResult.setPicHeight(height);
         uploadPictureResult.setPicScale(picScale);*/
         uploadPictureResult.setPicFormat(imageInfo.getFormat());
-
+        //设置主色调
+        uploadPictureResult.setPicColor(cosManager.getImageAve(uploadPath));
         //解析(压缩图)
         ProcessResults processResults = putObjectResult.getCiUploadResult().getProcessResults();
         List<CIObject> objectList = processResults.getObjectList();

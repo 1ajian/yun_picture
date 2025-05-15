@@ -26,6 +26,11 @@ public class PictureVO implements Serializable {
     private Long id;
 
     /**
+     * 原图
+     */
+    private String originalUrl;
+
+    /**
      * 图片 url
      */
     private String url;
@@ -110,6 +115,12 @@ public class PictureVO implements Serializable {
      * 空间 id
      */
     private Long spaceId;
+
+    /**
+     * 图片主色调
+     */
+    private String picColor;
+
 
 
     private static final long serialVersionUID = 1L;

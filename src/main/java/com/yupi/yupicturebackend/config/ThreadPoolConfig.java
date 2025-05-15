@@ -17,16 +17,16 @@ import java.util.concurrent.TimeUnit;
  * @Create 2025/5/8 20:23
  * @Version 1.0
  */
-//@Configuration
+@Configuration
 public class ThreadPoolConfig {
 
     @Bean
     public ThreadPoolExecutor threadPoolExecutor() {
-        ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(4,
-                8,
-                300,
+        ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(2,
+                4,
+                30,
                 TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(10),
+                new ArrayBlockingQueue<>(100),
                 Executors.defaultThreadFactory(),
                 new ThreadPoolExecutor.AbortPolicy());
 

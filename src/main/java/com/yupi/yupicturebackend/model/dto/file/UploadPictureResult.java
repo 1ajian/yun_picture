@@ -1,5 +1,6 @@
 package com.yupi.yupicturebackend.model.dto.file;
 
+import com.qcloud.cos.model.ciModel.image.ImageLabelResponse;
 import lombok.Data;
 
 /**
@@ -58,4 +59,15 @@ public class UploadPictureResult {
      * 原图url
      */
     private String originalUrl;
+
+    /**
+     * 图片主色调
+     */
+    private String picColor;
+
+    /**
+     * 包含标签信息的响应对象
+     */
+    private ImageLabelResponse pictureTagsResponse;
+
 }
