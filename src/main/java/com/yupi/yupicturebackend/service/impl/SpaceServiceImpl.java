@@ -14,16 +14,22 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yupi.yupicturebackend.exception.BusinessException;
 import com.yupi.yupicturebackend.exception.ErrorCode;
 import com.yupi.yupicturebackend.exception.ThrowUtils;
+import com.yupi.yupicturebackend.manager.sharding.DynamicShardingManager;
 import com.yupi.yupicturebackend.model.dto.space.SpaceAddRequest;
 import com.yupi.yupicturebackend.model.dto.space.SpaceQueryRequest;
 import com.yupi.yupicturebackend.model.entity.Space;
+import com.yupi.yupicturebackend.model.entity.SpaceUser;
 import com.yupi.yupicturebackend.model.entity.User;
 import com.yupi.yupicturebackend.model.enums.SpaceLevelEnum;
+import com.yupi.yupicturebackend.model.enums.SpaceRoleEnum;
+import com.yupi.yupicturebackend.model.enums.SpaceTypeEnum;
 import com.yupi.yupicturebackend.model.vo.SpaceVO;
 import com.yupi.yupicturebackend.model.vo.UserVO;
 import com.yupi.yupicturebackend.service.SpaceService;
 import com.yupi.yupicturebackend.mapper.SpaceMapper;
+import com.yupi.yupicturebackend.service.SpaceUserService;
 import com.yupi.yupicturebackend.service.UserService;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -45,6 +51,13 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
     @Resource
     private TransactionTemplate transactionTemplate;
 
+    @Resource
+    private SpaceUserService spaceUserService;
+
+    //@Resource
+    //@Lazy
+    //private DynamicShardingManager dynamicShardingManager;
+
     Map<Long,Object> lockMap = new ConcurrentHashMap<>();
     /**
      * 校验空间数据
@@ -58,7 +71,9 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
 
         String spaceName = space.getSpaceName();
         Integer spaceLevel = space.getSpaceLevel();
+        Integer spaceType = space.getSpaceType();
         SpaceLevelEnum spaceLevelEnum = SpaceLevelEnum.getEnumByValue(spaceLevel);
+        SpaceTypeEnum spaceTypeEnum = SpaceTypeEnum.getEnumByValue(spaceType);
 
         //是创建的情况
         if (add) {
@@ -68,6 +83,10 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
 
             if (ObjUtil.isNull(spaceLevelEnum)) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "空间级别不能为空");
+            }
+
+            if (ObjUtil.isNull(spaceTypeEnum)) {
+                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "空间类型不能为空");
             }
         }
 
@@ -110,16 +129,22 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
      */
     @Override
     public long addSpace(SpaceAddRequest spaceAddRequest, User loginUser) {
+        //TODO:可以优化,管理员允许创建多个空间
+
         //先进行实体类和DTO的转换
         Space space = new Space();
         BeanUtil.copyProperties(spaceAddRequest,space);
         //设置默认值
-        if (StrUtil.isBlank(space.getSpaceName())) {
+        if (StrUtil.isBlank(spaceAddRequest.getSpaceName())) {
             space.setSpaceName("默认空间");
         }
 
-        if (space.getSpaceLevel() == null) {
+        if (spaceAddRequest.getSpaceLevel() == null) {
             space.setSpaceLevel(SpaceLevelEnum.COMMON.getValue());
+        }
+
+        if (spaceAddRequest.getSpaceType() == null) {
+            space.setSpaceType(SpaceTypeEnum.PRIVATE.getValue());
         }
         //填充数据
         fillSpaceBySpaceLevel(space);
@@ -154,13 +179,30 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
         Object lock = lockMap.computeIfAbsent(userId, key -> new Object());
         synchronized (lock) {
             try {
-                boolean exists = this.lambdaQuery().eq(Space::getUserId, loginUser.getId()).exists();
+                //对于普通用户来说 只能有一个私有空间和一个团队空间
+                boolean exists = this.lambdaQuery()
+                        .eq(Space::getUserId, loginUser.getId())
+                        .eq(Space::getSpaceType,space.getSpaceType())
+                        .exists();
                 if (exists) {
                     throw new BusinessException(ErrorCode.OPERATION_ERROR, "每个用户只能创建一个私有的空间");
                 }
                 //返回新写入的id
                 boolean save = this.save(space);
                 ThrowUtils.throwIf(!save, ErrorCode.OPERATION_ERROR);
+
+                //对团队空间而言，还需要加上团队成员记录
+                if (spaceAddRequest.getSpaceType() == SpaceTypeEnum.TEAM.getValue()) {
+                    SpaceUser spaceUser = new SpaceUser();
+                    spaceUser.setSpaceId(space.getId());
+                    spaceUser.setUserId(userId);
+                    spaceUser.setSpaceRole(SpaceRoleEnum.ADMIN.getValue());
+                    boolean result = spaceUserService.save(spaceUser);
+                    ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR,"团队成员记录失败");
+                }
+                //创建图片分表(picture_spaceId)
+                //dynamicShardingManager.createSpacePictureTable(space);
+
                 return space.getId();
             } finally {
                 lockMap.remove(userId);
@@ -204,12 +246,14 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
          Integer spaceLevel = spaceQueryRequest.getSpaceLevel();
          String sortField = spaceQueryRequest.getSortField();
          String sortOrder = spaceQueryRequest.getSortOrder();
+         Integer spaceType = spaceQueryRequest.getSpaceType();
 
-         QueryWrapper<Space> spaceQueryWrapper = new QueryWrapper<>();
+        QueryWrapper<Space> spaceQueryWrapper = new QueryWrapper<>();
          spaceQueryWrapper.eq(ObjUtil.isNotEmpty(id),"id", id)
                  .eq(ObjUtil.isNotEmpty(userId),"userId", userId)
                  .like(StrUtil.isNotBlank(spaceName),"spaceName", spaceName)
                  .eq(ObjUtil.isNotEmpty(spaceLevel),"spaceLevel", spaceLevel)
+                 .eq(ObjUtil.isNotNull(spaceType), "spaceType",spaceType)
                  .orderBy(StrUtil.isNotBlank(sortField), "ascend".equals(sortOrder), sortField);
 
         return spaceQueryWrapper;
@@ -234,7 +278,8 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
             Long userId = space.getUserId();
             User user = userService.getById(userId);
             return userService.getUserVO(user);
-        }).collect(Collectors.toMap(UserVO::getId, userVO -> userVO));
+        }).distinct().collect(Collectors.toMap(UserVO::getId, userVO -> userVO));
+
 
         //构建结果
         List<SpaceVO> spaceVOList = new ArrayList<>();
@@ -245,10 +290,24 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
             spaceVO.setUser(map.get(userId));
             spaceVOList.add(spaceVO);
         }
+
+
         //设置结果集
         spaceVOPage.setRecords(spaceVOList);
         //返回
         return spaceVOPage;
+    }
+
+    /**
+     * 对空间进行权限验证
+     * @param loginUser
+     * @param space
+     */
+    @Override
+    public void checkSpaceAuth(User loginUser, Space space) {
+        if (!space.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR,"只有管理员和空间创建者可以访问");
+        }
     }
 }
 

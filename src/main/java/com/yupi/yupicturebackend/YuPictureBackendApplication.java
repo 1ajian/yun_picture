@@ -1,6 +1,7 @@
 package com.yupi.yupicturebackend;
 
 import com.yupi.yupicturebackend.api.aliyunai.AliYunAiApi;
+import org.apache.shardingsphere.spring.boot.ShardingSphereAutoConfiguration;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -8,7 +9,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.scheduling.annotation.EnableAsync;
 
-@SpringBootApplication
+@SpringBootApplication(exclude = {ShardingSphereAutoConfiguration.class})
 //这样就可以随机获取当前的代理对象
 @EnableAspectJAutoProxy(exposeProxy = true)
 @MapperScan("com.yupi.yupicturebackend.mapper")

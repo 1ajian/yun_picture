@@ -12,6 +12,7 @@ import com.yupi.yupicturebackend.constant.UserConstant;
 import com.yupi.yupicturebackend.exception.BusinessException;
 import com.yupi.yupicturebackend.exception.ErrorCode;
 import com.yupi.yupicturebackend.exception.ThrowUtils;
+import com.yupi.yupicturebackend.manager.auth.model.SpaceUserAuthManager;
 import com.yupi.yupicturebackend.model.dto.space.SpaceAddRequest;
 import com.yupi.yupicturebackend.model.dto.space.SpaceEditRequest;
 import com.yupi.yupicturebackend.model.dto.space.SpaceQueryRequest;
@@ -56,6 +57,9 @@ public class SpaceController {
 
     @Resource
     private PictureService pictureService;
+
+    @Resource
+    private SpaceUserAuthManager spaceUserAuthManager;
 
     /**
      * 添加空间
@@ -120,9 +124,7 @@ public class SpaceController {
         Space space = spaceService.getById(spaceId);
         ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR,"空间不存在");
         //需要是创建者才能删除空间
-        if (!space.getUserId().equals(loginUser.getId())) {
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR,"无权限删除空间");
-        }
+        spaceService.checkSpaceAuth(loginUser, space);
 
         //删除空间并删除空间中的所有图片
         boolean result = spaceService.removeById(spaceId);
@@ -179,6 +181,10 @@ public class SpaceController {
         ThrowUtils.throwIf(!spaceUserId.equals(userId),ErrorCode.NO_AUTH_ERROR);
         //构建SpaceVO对象
         SpaceVO spaceVO = spaceService.getSpaceVO(space,request);
+
+        List<String> permissionsByRole = spaceUserAuthManager.getPermissionsByRole(space, loginUser);
+        spaceVO.setPermissionList(permissionsByRole);
+
         return ResultUtils.success(spaceVO);
     }
 
@@ -243,9 +249,8 @@ public class SpaceController {
         ThrowUtils.throwIf(oldSpace == null, ErrorCode.NOT_FOUND_ERROR);
         //仅创建者和管理员可操作
         User loginUser = userService.getLoginUser(request);
-        if (!oldSpace.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR,"仅创建者和管理员可操作");
-        }
+        spaceService.checkSpaceAuth(loginUser, space);
+
         boolean result = spaceService.updateById(space);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(result);

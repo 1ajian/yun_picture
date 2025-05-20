@@ -83,7 +83,7 @@ public class UserController {
      */
     @GetMapping("/get/login")
     //@ApiOperation(value = "获取当前登录用户信息")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    //@AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<LoginUserVO> getLoginUser(HttpServletRequest request) {
         //获取登录用户信息
         User loginUser = userService.getLoginUser(request);

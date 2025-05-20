@@ -5,7 +5,9 @@ import com.yupi.yupicturebackend.model.entity.Space;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 /**
  * ClassName: SpaceVO
@@ -22,6 +24,11 @@ public class SpaceVO implements Serializable {
      * id
      */
     private Long id;
+
+    /**
+     * 空间类型：0-私有 1-团队
+     */
+    private Integer spaceType;
 
     /**
      * 空间名称
@@ -77,6 +84,12 @@ public class SpaceVO implements Serializable {
      * 创建用户信息
      */
     private UserVO user;
+
+    /**
+     * 权限列表
+     */
+    private List<String> permissionList = new ArrayList<>();
+
 
     private static final long serialVersionUID = 1L;
 

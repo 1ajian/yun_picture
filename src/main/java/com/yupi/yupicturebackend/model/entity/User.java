@@ -7,6 +7,7 @@ import java.util.Date;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
  * 用户
@@ -14,6 +15,8 @@ import lombok.Data;
  */
 @TableName(value ="user")
 @Data
+@EqualsAndHashCode
+
 public class User implements Serializable {
     /**
      * id

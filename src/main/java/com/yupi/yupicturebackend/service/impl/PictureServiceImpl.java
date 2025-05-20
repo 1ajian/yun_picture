@@ -117,9 +117,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             Space space = spaceService.getById(spaceId);
             ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR,"空间不存在");
             //必须是空间创建人才能上传
-            if (!loginUser.getId().equals(space.getUserId())) {
-                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间操作权限");
-            }
+//            if (!loginUser.getId().equals(space.getUserId())) {
+//                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间操作权限");
+//            }
 
             // 校验额度
             if (space.getTotalCount() >= space.getMaxCount()) {
@@ -131,6 +131,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             }
 
         }
+
 
         //TODO:这里可以使用工厂方法优化
         PictureUploadTemplate pictureUploadTemplate = filePictureUpload;
@@ -158,9 +159,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             this.clearPictureFile(picture);
 
             //权限控制(本人或者管理员)
-            if (!userService.isAdmin(loginUser) && !picture.getUserId().equals(loginUser.getId())) {
-                throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
-            }
+//            if (!userService.isAdmin(loginUser) && !picture.getUserId().equals(loginUser.getId())) {
+//                throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+//            }
 
             //校验空间是否一致
             Long pictureSpaceId = picture.getSpaceId();
@@ -223,6 +224,11 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             picture.setId(pictureId);
             picture.setEditTime(new Date());
         }
+
+        // 补充空间 id，默认为 0（分表）
+//        if (spaceId == null) {
+//            picture.setSpaceId(0L);
+//        }
 
         //填充审核参数
         this.fillReviewParams(picture, loginUser);
@@ -304,6 +310,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
                 .gt(ObjUtil.isNotNull(startEditTime), "editTime",startEditTime) // >=
                 .lt(ObjUtil.isNotNull(endEditTime), "editTime",endEditTime) // <
                 .orderBy(StrUtil.isNotBlank(sortField),"ascend".equals(sortOrder),sortField);
+
+        //分表使用 并且需要去掉spaceId作为条件（当spaceId为0的时候）
+        //queryWrapper.eq(nullSpaceId, "spaceId",0L);
 
         //从多个字段中搜索
         if (StrUtil.isNotBlank(searchText)) {
@@ -620,7 +629,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
      */
     @Override
     public Boolean deletePicture(DeleteRequest deleteRequest,User loginUser) {
-
+        //如果选择分表还需要传递spaceId，0代表公共空间 不然删除不了旗舰版空间的图片，因为原表中没有
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
         //先判断删除请求对象符不符合要求
         if (deleteRequest == null || deleteRequest.getId() <= 0) {
@@ -634,7 +643,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
         }
         //权限校验
-        checkPictureAuth(loginUser,picture);
+        //checkPictureAuth(loginUser,picture);
 
         //事务减少空间图片数量和大小
         Boolean result = transactionTemplate.execute(status -> {
@@ -698,7 +707,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
         }
 
-        this.checkPictureAuth(loginUser,picture);
+        //this.checkPictureAuth(loginUser,picture);
 
         //给图片填充审核参数
         this.fillReviewParams(picture, loginUser);

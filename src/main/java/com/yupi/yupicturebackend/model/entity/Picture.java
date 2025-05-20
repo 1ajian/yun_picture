@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import java.io.Serializable;
 import java.util.Date;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
  * 图片
@@ -14,6 +15,8 @@ import lombok.Data;
  */
 @TableName(value ="picture")
 @Data
+@EqualsAndHashCode
+
 public class Picture implements Serializable {
     /**
      * id

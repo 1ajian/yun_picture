@@ -10,6 +10,7 @@ import com.yupi.yupicturebackend.constant.UserConstant;
 import com.yupi.yupicturebackend.exception.BusinessException;
 import com.yupi.yupicturebackend.exception.ErrorCode;
 import com.yupi.yupicturebackend.exception.ThrowUtils;
+import com.yupi.yupicturebackend.manager.auth.StpKit;
 import com.yupi.yupicturebackend.mapper.UserMapper;
 import com.yupi.yupicturebackend.model.dto.user.UserQueryRequest;
 import com.yupi.yupicturebackend.model.entity.User;
@@ -37,7 +38,6 @@ import static com.yupi.yupicturebackend.constant.UserConstant.USER_LOGIN_STATE;
 @Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     implements UserService {
-
 
     /**
      * 用户注册
@@ -120,6 +120,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
         //将用户信息放入Session
         request.getSession().setAttribute(USER_LOGIN_STATE, user);
+
+        //用户登录成功后,保存登录状态到Sa-Token的空间账号体系中
+
+        /*
+        * 生成一个 Token（类似登录凭证）。
+        * 把用户 ID 和 Token 关联起来（存到 Redis 或内存）。
+        * 后续可以通过 Token 识别用户身份。
+        * */
+        //记录用户登录态到Sa-token,便于空间鉴权时使用,注意保证该用户与SpringSession中的信息过期时间一致
+        StpKit.SPACE.login(user.getId());
+        StpKit.SPACE.getSession().set(USER_LOGIN_STATE, user);
+
         return this.getLoginUserVo(user);
     }
 
