@@ -1,6 +1,7 @@
 package com.yupi.yupicturebackend.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -162,7 +164,9 @@ public class SpaceUserServiceImpl extends ServiceImpl<SpaceUserMapper, SpaceUser
     @Override
     public List<SpaceUserVO> getSpaceUserVOList(List<SpaceUser> spaceUserList) {
         //校验参数
-        ThrowUtils.throwIf(spaceUserList == null, ErrorCode.PARAMS_ERROR);
+        if (CollUtil.isEmpty(spaceUserList)) {
+            return Collections.emptyList();
+        }
         List<SpaceUserVO> result = spaceUserList.stream().map(SpaceUserVO::objToVo).collect(Collectors.toList());
 
         //获取空间Id集合、用户Id集合

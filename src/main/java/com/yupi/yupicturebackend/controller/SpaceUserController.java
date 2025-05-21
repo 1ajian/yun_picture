@@ -117,7 +117,7 @@ public class SpaceUserController {
         List<SpaceUser> spaceUserList = spaceUserService.list(spaceUserService.getQueryWrapper(spaceUserQueryRequest));
         //转换
         List<SpaceUserVO> spaceUserVOList = spaceUserService.getSpaceUserVOList(spaceUserList);
-        ThrowUtils.throwIf(spaceUserVOList.isEmpty(), ErrorCode.OPERATION_ERROR);
+        //ThrowUtils.throwIf(spaceUserVOList.isEmpty(), ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(spaceUserVOList);
     }
 
