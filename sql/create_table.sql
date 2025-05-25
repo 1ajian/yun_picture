@@ -22,6 +22,20 @@ create table if not exists user
 ) comment '用户' collate = utf8mb4_unicode_ci;
 
 
+ALTER TABLE user
+    ADD COLUMN vipExpireTime datetime NULL COMMENT '会员过期时间',
+    ADD COLUMN vipCode varchar(128) NULL COMMENT '会员兑换码',
+    ADD COLUMN vipNumber bigint NULL COMMENT '会员编号';
+
+# 给我用户表添加邮箱字段和手机号码字段，并给他们各自设置索引，并添加邮箱是唯一索引，手机号码是唯一索引
+ALTER TABLE user
+    ADD COLUMN email varchar(64) NULL COMMENT '邮箱',
+    ADD COLUMN phone varchar(32) NULL COMMENT '手机号码';
+ALTER TABLE user
+    ADD UNIQUE INDEX uk_email (email),
+    ADD UNIQUE INDEX uk_phone (phone);
+
+
 -- 图片表
 create table if not exists picture
 (
@@ -120,7 +134,30 @@ create table if not exists space_user
 ) comment '空间用户关联' collate = utf8mb4_unicode_ci;
 
 
+CREATE TABLE IF NOT EXISTS categories (
+  id bigint AUTO_INCREMENT comment 'id' PRIMARY KEY,
+  categoryName VARCHAR(50) NOT NULL COMMENT '分类名称',
+  sortOrder INT DEFAULT 0 COMMENT '排序权重',
+  createdTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updatedTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  usageCount INT DEFAULT 0 COMMENT '使用次数统计'
+) ENGINE=InnoDB COMMENT='图片分类表';
+# 帮我在categroies表中添加用户Id字段，用于标识是哪个用户添加的标签
+ALTER TABLE categories ADD COLUMN userId bigint NOT NULL COMMENT '用户Id';
+# 给categoryName字段加上唯一性约束
+ALTER TABLE categories ADD UNIQUE (categoryName);
 
+
+CREATE TABLE IF NOT EXISTS tags (
+    id bigint AUTO_INCREMENT comment 'id' PRIMARY KEY,
+    tagName VARCHAR(50) NOT NULL COMMENT '标签名称',
+    createdTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updatedTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    usageCount INT DEFAULT 0 COMMENT '使用次数统计'
+) ENGINE=InnoDB COMMENT='图片标签表';
+
+# 给我tags表中添加用户Id字段，用于标识是哪个用户添加的标签
+ALTER TABLE tags ADD COLUMN userId bigint NOT NULL COMMENT '用户Id';
 
 
 
