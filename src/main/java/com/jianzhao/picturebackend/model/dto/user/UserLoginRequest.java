@@ -37,4 +37,9 @@ public class UserLoginRequest implements Serializable {
      * 验证码
      */
     private String captchaCode;
+
+    /**
+     * 用户邮箱
+     */
+    private String email;
 }

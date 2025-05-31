@@ -7,6 +7,7 @@ import com.jianzhao.picturebackend.model.entity.User;
 import com.jianzhao.picturebackend.model.vo.CaptchaVo;
 import com.jianzhao.picturebackend.model.vo.LoginUserVO;
 import com.jianzhao.picturebackend.model.vo.UserVO;
+import org.springframework.scheduling.annotation.Async;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -109,4 +110,25 @@ public interface UserService extends IService<User> {
      */
     boolean exchangeVip(User user, String vipCode);
 
+    /**
+     * 发送邮箱验证码
+     * @param userEmail
+     * @return
+     */
+    String sendEmailCode(String userEmail);
+
+    /**
+     * 邮箱注册
+     *
+     * @param userEmail
+     * @param password
+     * @param checkPassword
+     * @param key
+     * @param code
+     * @param otherShareCode
+     * @return
+     */
+    Long registerEmail(String userEmail, String password, String checkPassword, String key, String code,String otherShareCode);
+
+    void sendEmailAsRegisterSuccess(String userEmail, String subject, String userAccount, String password);
 }

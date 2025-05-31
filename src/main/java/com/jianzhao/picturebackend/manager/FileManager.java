@@ -113,7 +113,7 @@ public class FileManager {
         long size = multipartFile.getSize();
         final long ONE_M = 1024 * 1024L;
         //TODO:有坑 因为servlet默认文件大小是1MB
-        ThrowUtils.throwIf(size > 2 * ONE_M, new BusinessException(ErrorCode.PARAMS_ERROR, "文件大小不能超过 2M"));
+        ThrowUtils.throwIf(size > 15 * ONE_M, new BusinessException(ErrorCode.PARAMS_ERROR, "文件大小不能超过 15M"));
         //验证后缀
         String fileSuffix = FileUtil.getSuffix(multipartFile.getOriginalFilename());
         //允许上传文件的后缀
@@ -244,8 +244,8 @@ public class FileManager {
             try {
                 if (StrUtil.isNotBlank(contentLengthStr)) {
                     long contentLength = Long.parseLong(contentLengthStr);
-                    final long TWO_MB = 2 * 1024 * 1024L;
-                    ThrowUtils.throwIf(contentLength > TWO_MB, ErrorCode.PARAMS_ERROR,"文件大小不能超过2M");
+                    final long ONE_MB = 1024 * 1024L;
+                    ThrowUtils.throwIf(contentLength > 15 * ONE_MB, ErrorCode.PARAMS_ERROR,"文件大小不能超过15M");
                 }
             } catch (NumberFormatException e) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR,"文件大小格式错误");

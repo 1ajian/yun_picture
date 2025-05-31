@@ -67,7 +67,7 @@ public class UrlPictureUpload extends PictureUploadTemplate {
 
         try {
             //3.发送HEAD请求验证文件是否存在
-            response = HttpUtil.createRequest(Method.HEAD, fileUrl).execute();
+            response = HttpUtil.createRequest(Method.GET, fileUrl).execute();
             if (response.getStatus() != HttpStatus.HTTP_OK) {
                 //return;
                 //不报错 仅对能获取到的信息进行校验。
@@ -89,8 +89,8 @@ public class UrlPictureUpload extends PictureUploadTemplate {
             try {
                 if (StrUtil.isNotBlank(contentLengthStr)) {
                     long contentLength = Long.parseLong(contentLengthStr);
-                    final long TWO_MB = 2 * 1024 * 1024L;
-                    ThrowUtils.throwIf(contentLength > TWO_MB, ErrorCode.PARAMS_ERROR,"文件大小不能超过2M");
+                    final long ONE_MB = 1024 * 1024L;
+                    ThrowUtils.throwIf(contentLength > 15 * ONE_MB, ErrorCode.PARAMS_ERROR,"文件大小不能超过15M");
                 }
             } catch (NumberFormatException e) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR,"文件大小格式错误");

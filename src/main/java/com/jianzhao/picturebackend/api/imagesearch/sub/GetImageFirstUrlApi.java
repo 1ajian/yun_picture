@@ -47,11 +47,13 @@ public class GetImageFirstUrlApi {
 
                 }
             }
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR,"未找到url");
+            //throw new BusinessException(ErrorCode.NOT_FOUND_ERROR,"未找到url");
         } catch (Exception e) {
             log.error("搜索失败", e);
             throw new BusinessException(ErrorCode.OPERATION_ERROR,"搜索失败");
         }
+
+        return "";
     }
 
     public static void main(String[] args) {

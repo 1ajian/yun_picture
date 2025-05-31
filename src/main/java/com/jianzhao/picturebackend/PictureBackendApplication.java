@@ -6,12 +6,14 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(exclude = {ShardingSphereAutoConfiguration.class})
 //这样就可以随机获取当前的代理对象
 @EnableAspectJAutoProxy(exposeProxy = true)
 @MapperScan("com.jianzhao.picturebackend.mapper")
 @EnableAsync
+@EnableScheduling
 public class PictureBackendApplication {
 
     public static void main(String[] args) {

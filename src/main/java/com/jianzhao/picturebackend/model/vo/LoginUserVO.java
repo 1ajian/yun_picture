@@ -45,6 +45,31 @@ public class LoginUserVO implements Serializable {
     private String userProfile;
 
     /**
+     *  分享码
+     */
+    private String shareCode;
+
+    /**
+     * 手机号
+     */
+    private String phone;
+
+    /**
+     * 邮箱
+     */
+    private String email;
+
+    /**
+     * 会员过期时间
+     */
+    private Date vipExpireTime;
+
+    /**
+     * 会员编号
+     */
+    private Long vipNumber;
+
+    /**
      * 用户角色：user/admin
      */
     private String userRole;

@@ -42,4 +42,14 @@ public class UserAddRequest implements Serializable {
      */
     private String userRole;
 
+    /**
+     * 邮箱
+     */
+    private String email;
+
+    /**
+     * 手机号
+     */
+    private String phone;
+
 }

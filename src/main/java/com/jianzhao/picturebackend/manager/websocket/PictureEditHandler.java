@@ -256,7 +256,7 @@ public class PictureEditHandler extends TextWebSocketHandler {
 
             for (WebSocketSession session : sessionSet) {
                 //排除掉不需要传递的session
-                if (sessionSet.contains(excludeSession)) {
+                if (excludeSession != null && sessionSet.contains(excludeSession)) {
                     continue;
                 }
 
@@ -290,7 +290,7 @@ public class PictureEditHandler extends TextWebSocketHandler {
      * @param pictureEditResponseMessage
      */
     private void broadcastToPicture(Long pictureId, PictureEditResponseMessage pictureEditResponseMessage) {
-        broadcastToPicture(pictureId,pictureEditResponseMessage);
+        broadcastToPicture(pictureId,pictureEditResponseMessage,null);
     }
 
 

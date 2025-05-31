@@ -2,7 +2,12 @@ package com.jianzhao.picturebackend.controller;
 
 import cn.hutool.captcha.CaptchaUtil;
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.lang.RegexPool;
+import cn.hutool.core.util.ObjUtil;
+import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.extra.mail.MailUtil;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.jianzhao.picturebackend.annotation.AuthCheck;
 import com.jianzhao.picturebackend.common.BaseResponse;
@@ -18,7 +23,10 @@ import com.jianzhao.picturebackend.model.vo.CaptchaVo;
 import com.jianzhao.picturebackend.model.vo.LoginUserVO;
 import com.jianzhao.picturebackend.model.vo.UserVO;
 import com.jianzhao.picturebackend.service.UserService;
+import com.jianzhao.picturebackend.utils.EmailUtils;
 import net.bytebuddy.implementation.bytecode.Throw;
+import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -43,8 +51,11 @@ public class UserController {
     @Resource
     private UserService userService;
 
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
     /**
-     * 用户注册
+     * 用户注册 (使用账号密码注册)
      * @param userRegisterRequest
      * @return
      */
@@ -58,6 +69,41 @@ public class UserController {
         String userAccount = userRegisterRequest.getUserAccount();
         long res = userService.userRegister(userAccount, userPassword, checkPassword,shareCode);
         return ResultUtils.success(res);
+    }
+
+    /**
+     * 用户注册发送邮箱验证码
+     * @param userEmail
+     * @return key
+     */
+    @PostMapping("/register/send/email")
+    public BaseResponse<String> sendEmailRegisterCode(String userEmail) {
+        ThrowUtils.throwIf(StrUtil.isBlank(userEmail), ErrorCode.PARAMS_ERROR);
+        //校验邮箱
+        if (!ReUtil.isMatch(RegexPool.EMAIL, userEmail)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱格式有误");
+        }
+
+        //发送邮箱 并返回结果
+        return ResultUtils.success(userService.sendEmailCode(userEmail));
+    }
+
+    /**
+     * 邮箱注册
+     * @param userSendEmailRequest
+     * @return
+     */
+    @PostMapping("/register/email")
+    public BaseResponse<Long> emailRegister(@RequestBody UserSendEmailRequest userSendEmailRequest) {
+        ThrowUtils.throwIf(ObjUtil.isNull(userSendEmailRequest), ErrorCode.PARAMS_ERROR);
+        String otherShareCode = userSendEmailRequest.getOtherShareCode();
+        String userEmail = userSendEmailRequest.getUserEmail();
+        String password = userSendEmailRequest.getPassword();
+        String checkPassword = userSendEmailRequest.getCheckPassword();
+        String key = userSendEmailRequest.getKey();
+        String code = userSendEmailRequest.getCode();
+        Long userId = userService.registerEmail(userEmail,password,checkPassword,key,code,otherShareCode);
+        return ResultUtils.success(userId);
     }
 
     /**
@@ -126,16 +172,32 @@ public class UserController {
     //@ApiOperation(value = "创建用户")
     @AuthCheck(mustRole = {UserConstant.ADMIN_ROLE})
     public BaseResponse<Long> addUser(@RequestBody UserAddRequest userAddRequest) {
+        ThrowUtils.throwIf(userAddRequest == null, ErrorCode.PARAMS_ERROR);
         User user = new User();
         BeanUtil.copyProperties(userAddRequest, user);
+        String email = userAddRequest.getEmail();
+        String account = userAddRequest.getUserAccount();
+
+        if (StrUtil.isBlank(email) && StrUtil.isBlank(account)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名或邮箱不能为空");
+        }
+
         String encryptPassword = userService.getEncryptPassword(UserConstant.DEFAULT_PASSWORD);
         user.setUserPassword(encryptPassword);
         if (StrUtil.isBlank(userAddRequest.getUserName())) {
             user.setUserName("图友" + UUID.randomUUID().toString().replaceAll("-", "").substring(0,8));
         }
 
+        if (StrUtil.isBlank(account) && StrUtil.isNotBlank(email)) {
+            user.setUserAccount(email);
+        }
+
         boolean result = userService.save(user);
         ThrowUtils.throwIf(!result, new BusinessException(ErrorCode.OPERATION_ERROR));
+        //判断如果请求参数中有邮箱且邮箱不为空则发送邮件验证码
+        if (StrUtil.isBlank(account) && StrUtil.isNotBlank(email)) {
+            userService.sendEmailAsRegisterSuccess(email, "许小健智能AI图库 - 添加用户成功通知",email,UserConstant.DEFAULT_PASSWORD);
+        }
         return ResultUtils.success(user.getId());
     }
 
@@ -195,8 +257,19 @@ public class UserController {
         if (userUpdateRequest == null || userUpdateRequest.getId() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
+
         User user = new User();
         BeanUtil.copyProperties(userUpdateRequest, user);
+
+        Long userId = userUpdateRequest.getId();
+        User oldUser = userService.getById(userId);
+        ThrowUtils.throwIf(oldUser == null, ErrorCode.NOT_FOUND_ERROR);
+
+        //如果邮箱和账号是一样的，修改邮箱就要顺便改账号
+        if (StrUtil.isNotBlank(userUpdateRequest.getEmail()) && oldUser.getEmail().equals(oldUser.getUserAccount())) {
+            user.setUserAccount(userUpdateRequest.getEmail());
+        }
+
         boolean res = userService.updateById(user);
         ThrowUtils.throwIf(!res, new BusinessException(ErrorCode.OPERATION_ERROR ));
         return ResultUtils.success(res);
@@ -240,5 +313,62 @@ public class UserController {
         return ResultUtils.success(result);
     }
 
+    /**
+     * 更新用户信息
+     * @param updateUserInfoRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/update/userInfo")
+    public BaseResponse<Boolean> updateUserVipInfo(@RequestBody UpdateUserInfoRequest updateUserInfoRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf( updateUserInfoRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        User user = new User();
+        BeanUtil.copyProperties(updateUserInfoRequest,user);
+        user.setId(loginUser.getId());
+        boolean success = userService.updateById(user);
+        ThrowUtils.throwIf(!success, ErrorCode.OPERATION_ERROR, "更新失败");
+        return ResultUtils.success(success);
+    }
+
+    /**
+     * 用户修改密码
+     * @param userUpdatePassword
+     * @param request
+     * @return
+     */
+    @PostMapping("/update/password")
+    public BaseResponse<Boolean> updatePassword(@RequestBody UserUpdatePassword userUpdatePassword,HttpServletRequest request) {
+
+        ThrowUtils.throwIf(userUpdatePassword == null, ErrorCode.PARAMS_ERROR);
+        String oldPassword = userUpdatePassword.getOldPassword();
+        String newPassword = userUpdatePassword.getNewPassword();
+        String confirmPassword = userUpdatePassword.getConfirmPassword();
+
+        if (StrUtil.hasBlank(oldPassword, newPassword, confirmPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
+        }
+
+        ThrowUtils.throwIf(newPassword.length() < 8 || newPassword.length() > 16, ErrorCode.PARAMS_ERROR, "密码长度不小于8位，不大于16位");
+
+        if (!newPassword.equals(confirmPassword)) {
+             throw new BusinessException(ErrorCode.PARAMS_ERROR, "两次输入密码不一致");
+        }
+
+        //获取当前登录用户
+        User loginUser = userService.getLoginUser(request);
+        String userPasswordDb = loginUser.getUserPassword();
+        String encryptPassword = userService.getEncryptPassword(oldPassword);
+        if (!userPasswordDb.equals(encryptPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "原密码错误");
+        }
+
+        User user = new User();
+        user.setId(loginUser.getId());
+        user.setUserPassword(userService.getEncryptPassword(newPassword));
+        boolean success = userService.updateById(user);
+        ThrowUtils.throwIf(!success, ErrorCode.OPERATION_ERROR, "修改密码失败");
+        return ResultUtils.success(success);
+    }
 
 }

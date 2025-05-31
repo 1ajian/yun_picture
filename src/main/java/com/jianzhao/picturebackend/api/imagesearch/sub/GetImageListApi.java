@@ -13,6 +13,7 @@ import com.jianzhao.picturebackend.exception.ErrorCode;
 import com.jianzhao.picturebackend.exception.ThrowUtils;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -41,12 +42,14 @@ public class GetImageListApi {
                 return processResponse(response.body());
             } else {
                 log.error("获取图片列表接口调用失败");
-                throw new BusinessException(ErrorCode.OPERATION_ERROR, "接口调用失败");
+                //throw new BusinessException(ErrorCode.OPERATION_ERROR, "接口调用失败");
             }
         } catch (Exception e) {
             log.error("获取图片列表失败", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "获取图片列表失败");
+            //throw new BusinessException(ErrorCode.OPERATION_ERROR, "获取图片列表失败");
         }
+
+        return Collections.emptyList();
     }
 
     /**

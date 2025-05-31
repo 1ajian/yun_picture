@@ -26,7 +26,7 @@ public class ThreadPoolConfig {
                 4,
                 30,
                 TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(100),
+                new ArrayBlockingQueue<>(512),
                 Executors.defaultThreadFactory(),
                 new ThreadPoolExecutor.AbortPolicy());
 

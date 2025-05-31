@@ -12,8 +12,13 @@ import com.jianzhao.picturebackend.annotation.AuthCheck;
 import com.jianzhao.picturebackend.api.aliyunai.AliYunAiApi;
 import com.jianzhao.picturebackend.api.aliyunai.model.CreateOutPaintingTaskResponse;
 import com.jianzhao.picturebackend.api.aliyunai.model.GetOutPaintingTaskResponse;
+import com.jianzhao.picturebackend.api.hunyuanmodel.TencentAIPaintingApi;
+import com.jianzhao.picturebackend.api.hunyuanmodel.model.HunyuanImageResponse;
+import com.jianzhao.picturebackend.api.hunyuanmodel.model.SubmitImageJobRequest;
 import com.jianzhao.picturebackend.api.imagesearch.ImageSearchApiFacade;
 import com.jianzhao.picturebackend.api.imagesearch.model.ImageSearchResult;
+import com.jianzhao.picturebackend.api.so_360.ImageSearch360APIFacade;
+import com.jianzhao.picturebackend.api.so_360.model.ImageSearch360Result;
 import com.jianzhao.picturebackend.common.BaseResponse;
 import com.jianzhao.picturebackend.common.DeleteRequest;
 import com.jianzhao.picturebackend.common.ResultUtils;
@@ -31,6 +36,9 @@ import com.jianzhao.picturebackend.model.enums.PictureReviewStatusEnum;
 import com.jianzhao.picturebackend.model.vo.PictureTagCategory;
 import com.jianzhao.picturebackend.model.vo.PictureVO;
 import com.jianzhao.picturebackend.service.*;
+import com.tencentcloudapi.hunyuan.v20230901.models.QueryHunyuanImageJobResponse;
+import com.tencentcloudapi.hunyuan.v20230901.models.SubmitHunyuanImageJobRequest;
+import com.tencentcloudapi.hunyuan.v20230901.models.SubmitHunyuanImageJobResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -40,6 +48,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -82,6 +91,9 @@ public class PictureController {
 
     @Resource
     private SpaceUserAuthManager spaceUserAuthManager;
+
+    @Resource
+    private TencentAIPaintingApi tencentAIPaintingApi;
 
     /**
      * 本地缓存 Caffeine
@@ -301,6 +313,7 @@ public class PictureController {
 //            if (!loginUser.getId().equals(space.getUserId())) {
 //                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有权限访问");
 //            }
+            //私有空间或者公有空间
             boolean hasPermission = StpKit.SPACE.hasPermission(SpaceUserPermissionConstant.PICTURE_VIEW);
             ThrowUtils.throwIf(!hasPermission, ErrorCode.NO_AUTH_ERROR);
         }
@@ -538,7 +551,7 @@ public class PictureController {
      * @return
      */
     @PostMapping("/upload/batch")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    //@AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Integer> uploadPictureByBatch(@RequestBody PictureUploadByBatchRequest pictureUploadByBatchRequest,
                                                       HttpServletRequest request) {
         //校参
@@ -554,6 +567,7 @@ public class PictureController {
      * @return
      */
     @PostMapping("/deleteBatchPicture")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> deleteBatchPicture(@RequestParam List<Long> pictureIds) {
         pictureService.deleteBatchPicture(pictureIds);
         return ResultUtils.success(true);
@@ -576,8 +590,58 @@ public class PictureController {
         //调用接口方法
         String originalUrl = oldPicture.getOriginalUrl();
         List<ImageSearchResult> imageSearchResults = ImageSearchApiFacade.searchImage(originalUrl);
+
+        //如果为空就调用360的进行尝试
+        if (imageSearchResults.isEmpty()) {
+            //请求360搜图接口作为替补
+            BaseResponse<List<ImageSearch360Result>> response = searchPictureByPictureSo(request);
+            List<ImageSearch360Result> data = response.getData();
+            imageSearchResults = data.stream().map(imageSearchResult -> {
+                ImageSearchResult result = new ImageSearchResult();
+                result.setFromUrl(imageSearchResult.getSite());
+                if (StrUtil.isNotBlank(imageSearchResult.getImgurl())) {
+                    result.setThumbUrl(imageSearchResult.getImgurl());
+                } else {
+                    result.setThumbUrl(imageSearchResult.getSpareUrl());
+                }
+                return result;
+            }).collect(Collectors.toList());
+        }
         //返回
         return ResultUtils.success(imageSearchResults);
+    }
+
+    /**
+     * 360以图搜图接口
+     * @param request
+     * @return
+     */
+    @PostMapping("/search/picture/so")
+    public BaseResponse<List<ImageSearch360Result>> searchPictureByPictureSo(@RequestBody SearchPictureByPictureRequest request) {
+        //先判空
+        ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
+        Long pictureId = request.getPictureId();
+        ThrowUtils.throwIf(pictureId == null || pictureId <= 0, ErrorCode.PARAMS_ERROR);
+        //查询原图是否存在
+        Picture oldPicture = pictureService.getById(pictureId);
+        ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
+        String imageUrl = StrUtil.isNotBlank(oldPicture.getOriginalUrl()) ? oldPicture.getOriginalUrl() : oldPicture.getUrl();
+
+        List<ImageSearch360Result> pictureList = new ArrayList<>();
+        //调用接口方法
+        int start = 0;
+        while (pictureList.size() < 50) {
+            List<ImageSearch360Result> tempList = ImageSearch360APIFacade.searchImage(imageUrl, start);
+            if (tempList.isEmpty()) {
+                break;
+            }
+
+            pictureList.addAll(tempList);
+            start += tempList.size();
+        }
+
+
+        return ResultUtils.success(pictureList);
     }
 
     /**
@@ -604,6 +668,7 @@ public class PictureController {
      * @return
      */
     @PostMapping("/changeAllAve")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> updateAllAve(Long spaceId) {
         pictureService.updateAllAve(spaceId);
         return ResultUtils.success(true);
@@ -651,5 +716,29 @@ public class PictureController {
         ThrowUtils.throwIf(taskId == null, ErrorCode.PARAMS_ERROR);
         GetOutPaintingTaskResponse response = aliYunAiApi.getOutPaintingTask(taskId);
         return ResultUtils.success(response);
+    }
+
+    /**
+     * 提交图片任务
+     * @param request
+     * @return
+     */
+    @PostMapping("/AIPainting/submit")
+    public BaseResponse<SubmitHunyuanImageJobResponse> submitHunyuanImageJob(@RequestBody SubmitImageJobRequest request) {
+        ThrowUtils.throwIf(request == null,  ErrorCode.PARAMS_ERROR);
+        SubmitHunyuanImageJobResponse submitHunyuanImageJobResponse = tencentAIPaintingApi.submitHunyuanImageJob(request);
+        return ResultUtils.success(submitHunyuanImageJobResponse);
+    }
+
+    /**
+     * 获取图片任务
+     * @param jobId
+     * @return
+     */
+    @GetMapping("/AIPainting/get")
+    public BaseResponse<QueryHunyuanImageJobResponse> getHunyuanImageJob(String jobId) {
+        ThrowUtils.throwIf(StrUtil.isBlank(jobId),  ErrorCode.PARAMS_ERROR);
+        QueryHunyuanImageJobResponse imageJob = tencentAIPaintingApi.getImageJob(jobId);
+        return ResultUtils.success(imageJob);
     }
 }

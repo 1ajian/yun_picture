@@ -104,7 +104,7 @@ public abstract class PictureUploadTemplate {
 
         } catch (Exception e) {
             log.error("图片上传到对象存储服务失败",e);
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, e.getMessage());
         } finally {
             deleteFile(file);
         }

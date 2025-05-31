@@ -1,5 +1,5 @@
 server:
-  port: 8124
+  port: 8123
   servlet:
     context-path: /api
     # cookie 30 天过期
@@ -8,6 +8,28 @@ server:
         max-age: 259200
 
 spring:
+  # 邮箱配置
+  mail:
+    host: ${email.host}
+    port: ${email.port}
+    username: ${email.username}
+    password: ${email.password}
+    protocol: ${email.protocol}
+    default-encoding: UTF-8
+    properties:
+      mail:
+          smtp:
+            auth: true
+            starttls:
+              enable: true
+              required: true
+            ssl:
+              enabled: true
+            socketFactory:
+                port: ${email.port}
+                class: javax.net.ssl.SSLSocketFactory
+
+
   # 空间图片分表
   shardingsphere:
     datasource:
@@ -43,7 +65,7 @@ spring:
     timeout: 259200
   servlet:
     multipart:
-      max-file-size: 10MB
+      max-file-size: 15MB
 
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
@@ -99,4 +121,5 @@ user-agents:
     - "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36"
     - "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0"
 
-
+nickname: "许小健"
+subject-prefix: "许小健智能AI图库 - "

@@ -43,8 +43,8 @@ public interface UserConstant {
 
     //  region redis缓存相关
 
-    // 缓存用户图片验证码key
     String CAPTCHA_CODE_KEY = "user:login:captchaCode:";
 
+    String EMAIL_CODE_KEY = "user:email:code:%s:%s";
     //  endregion
 }

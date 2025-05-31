@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
+import java.util.Date;
 
 /**
  * ClassName: UserQueryRequest
@@ -45,4 +46,24 @@ public class UserQueryRequest extends PageRequest implements Serializable {
      * 用户角色：user/admin/ban
      */
     private String userRole;
+    /**
+     * vip开始时间
+     */
+    private Date beginVipExpireTime;
+
+    /**
+     * vip到期时间
+     */
+    private Date endVipExpireTime;
+
+    /**
+     *  邮箱
+     */
+    private String email;
+
+    /**
+     * 手机号
+     */
+    private String phone;
+
 }

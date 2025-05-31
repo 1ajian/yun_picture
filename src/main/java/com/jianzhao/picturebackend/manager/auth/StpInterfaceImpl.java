@@ -131,7 +131,7 @@ public class StpInterfaceImpl implements StpInterface {
             return Collections.emptyList();
         }
 
-        //获取所有的管理员权限
+        // 获取所有的管理员权限
         List<String> ADMIN_PERMISSIONS = spaceUserAuthManager.getPermissionsByRole(SpaceRoleEnum.ADMIN.getValue());
 
         // 获取上下文对象

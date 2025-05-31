@@ -34,6 +34,8 @@ public class PictureEditEventDisruptorConfig {
 
         //设置消费者
         disruptor.handleEventsWithWorkerPool(pictureEditEventWorkHandler);
+        //开启disruptor
+        disruptor.start();
         return disruptor;
     }
 }

@@ -6,8 +6,10 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.resource.ResourceUtil;
+import cn.hutool.core.lang.RegexPool;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONUtil;
@@ -27,21 +29,25 @@ import com.jianzhao.picturebackend.model.vo.CaptchaVo;
 import com.jianzhao.picturebackend.model.vo.LoginUserVO;
 import com.jianzhao.picturebackend.model.vo.UserVO;
 import com.jianzhao.picturebackend.service.UserService;
+import com.jianzhao.picturebackend.utils.EmailUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
+import javax.mail.MessagingException;
+import javax.mail.internet.MimeMessage;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -61,6 +67,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+
+    @Autowired
+    private JavaMailSender javaMailSender;
+
+    @Value("${nickname}")
+    private String nickname;
+
+    @Value("${spring.mail.username}")
+    private String from;
+
+    @Value("${subject-prefix}")
+    private String subjectPrefix;
 
     private final ReentrantLock fileLock = new ReentrantLock();
 
@@ -116,6 +134,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         boolean saveRes = this.save(user);
 
         ThrowUtils.throwIf(!saveRes, new BusinessException(ErrorCode.SYSTEM_ERROR,"注册失败,数据库错误"));
+
+        //发送邮件通知注册成功
         return user.getId();
     }
 
@@ -161,7 +181,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return
      */
     @Override
-    public LoginUserVO userLogin(String userAccount, String userPassword,String captchaKey,String captchaCode, HttpServletRequest request) {
+    public LoginUserVO userLogin(String userAccount, String userPassword, String captchaKey, String captchaCode, HttpServletRequest request) {
         //校验
         if (StrUtil.hasBlank(userAccount,userPassword,captchaCode,captchaKey)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"参数为空");
@@ -179,10 +199,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"验证码有误");
         }
 
-
         //redis获取验证码
         String lowerCode = captchaCode.toLowerCase();
         String code = stringRedisTemplate.opsForValue().get(captchaKey);
+        if (StrUtil.isBlank(code)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "验证码不存在或已过期!");
+        }
         if (!lowerCode.equals(code)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "验证码有误");
         }
@@ -191,9 +213,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         String encryptPassword = getEncryptPassword(userPassword);
 
         //验证账号和密码是否正确
-        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<User>()
-                .eq(User::getUserAccount, userAccount)
-                .eq(User::getUserPassword, encryptPassword);
+        LambdaQueryWrapper<User> queryWrapper = null;
+        //先要判断是使用什么方式登录的
+        if (ReUtil.isMatch(RegexPool.EMAIL,userAccount)) {
+            //使用邮箱登录
+            queryWrapper = new LambdaQueryWrapper<User>()
+                    .eq(User::getEmail, userAccount)
+                    .eq(User::getUserPassword,encryptPassword);
+        }else {
+            //使用账号登录
+            queryWrapper = new LambdaQueryWrapper<User>()
+                    .eq(User::getUserAccount, userAccount)
+                    .eq(User::getUserPassword, encryptPassword);
+        }
 
         User user = this.baseMapper.selectOne(queryWrapper);
 
@@ -333,12 +365,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         String userProfile = userQueryRequest.getUserProfile();
         String sortField = userQueryRequest.getSortField();
         String sortOrder = userQueryRequest.getSortOrder();
+        Date beginVipExpireTime = userQueryRequest.getBeginVipExpireTime();
+        Date endVipExpireTime = userQueryRequest.getEndVipExpireTime();
+        String email = userQueryRequest.getEmail();
+        String phone = userQueryRequest.getPhone();
         return new QueryWrapper<User>()
                 .eq(ObjUtil.isNotNull(id), "id", id)
                 .like(ObjUtil.isNotEmpty(userName), "userName", userName)
                 .like(ObjUtil.isNotEmpty(userAccount), "userAccount", userAccount)
                 .eq(ObjUtil.isNotEmpty(userRole), "userRole", userRole)
                 .like(ObjUtil.isNotEmpty(userProfile), "userProfile", userProfile)
+                .like(ObjUtil.isNotEmpty(email), "email", email)
+                .like(ObjUtil.isNotEmpty(phone), "phone", phone)
+                .ge(ObjUtil.isNotNull(beginVipExpireTime), "vipExpireTime", beginVipExpireTime)
+                .lt(ObjUtil.isNotNull(endVipExpireTime), "vipExpireTime", endVipExpireTime)
                 .orderBy(StrUtil.isNotBlank(sortField),"ascend".equals(sortOrder),sortField);
     }
 
@@ -478,7 +518,139 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
     }
 
+    /**
+     * 发送邮件验证码
+     * @param userEmail
+     * @return
+     */
+    @Override
+    public String sendEmailCode(String userEmail) {
+        //首先需要先校验当前邮箱是否被使用
+        boolean exists = this.lambdaQuery().eq(User::getEmail, userEmail).exists();
+        if (exists) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "该邮箱已被使用,请直接登录!");
+        }
 
+        //先构建缓存key
+        String key = UUID.randomUUID().toString().replace("-", "").substring(0,8);
+        String cacheKey = String.format(UserConstant.EMAIL_CODE_KEY, userEmail,key);
+        //构建验证码
+        String code = RandomUtil.randomNumbers(4);
+        stringRedisTemplate.opsForValue().set(cacheKey, code, 300, TimeUnit.SECONDS);
+        //发送验证码
+        sendEmailAsCode(userEmail, "许小健智能AI图库 - 注册验证码", code);
+        return key;
+    }
+
+    /**
+     * 邮箱注册
+     * @param userEmail
+     * @param password
+     * @param checkPassword
+     * @param key
+     * @param code
+     * @param otherShareCode
+     * @return
+     */
+    @Override
+    public Long registerEmail(String userEmail, String password, String checkPassword, String key, String code, String otherShareCode) {
+        if (StrUtil.hasBlank(userEmail, password, checkPassword, key, code)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        //再次校验当前用户是否存在
+        boolean exists = this.lambdaQuery().eq(User::getEmail, userEmail).exists();
+        ThrowUtils.throwIf(exists, ErrorCode.OPERATION_ERROR, "该邮箱已被使用!");
+        //校验邮箱
+        if (!ReUtil.isMatch(RegexPool.EMAIL, userEmail)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱格式有误!");
+        }
+
+        //校验验证码是否一致
+        String cacheKey = String.format(UserConstant.EMAIL_CODE_KEY,userEmail,key);
+        String cacheCode = stringRedisTemplate.opsForValue().get(cacheKey);
+        if (cacheCode == null || !cacheCode.equals(code)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "验证码错误!");
+        }
+        //删除缓存验证码
+        stringRedisTemplate.delete(cacheKey);
+
+        //校验密码
+        ThrowUtils.throwIf(password.length() < 8 || checkPassword.length() < 8,new BusinessException(ErrorCode.PARAMS_ERROR,"用户密码过短"));
+        if (StrUtil.isBlank(password) || StrUtil.isBlank(checkPassword) || !password.equals(checkPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "两次输入的密码不一致!");
+        }
+        //加入数据库
+        User user = new User();
+        //密码加密
+        String encryptPassword = this.getEncryptPassword(password);
+        user.setUserPassword(encryptPassword);
+        user.setUserAccount(userEmail);
+        user.setEmail(userEmail);
+        user.setUserName("图友-" + UUID.randomUUID().toString().replace("-", "").substring(0,8));
+        String shareCode = UUID.randomUUID().toString().replace("-", "");
+        user.setShareCode(shareCode);
+
+        if (StrUtil.isNotBlank(otherShareCode)) {
+            User shareUser = this.query().eq("shareCode", otherShareCode).one();
+            if (shareUser != null) {
+                user.setInviteUser(shareUser.getId());
+            }
+        }
+        boolean success = this.save(user);
+        ThrowUtils.throwIf(!success, ErrorCode.OPERATION_ERROR, "注册失败");
+        sendEmailAsRegisterSuccess(userEmail,subjectPrefix + "注册成功通知",userEmail,password);
+        return user.getId();
+    }
+
+    /**
+     *  发送邮箱验证码
+     * @param userEmail
+     * @param subject
+     * @param code
+     */
+    @Async("threadPoolExecutor")
+    private void sendEmailAsCode(String userEmail, String subject,String code) {
+        HashMap<String, Object> param = new HashMap<>();
+        param.put("code", code);
+        try {
+            MimeMessage mimeMessage = javaMailSender.createMimeMessage();
+            //组合邮箱发送内容
+            MimeMessageHelper messageHelper = new MimeMessageHelper(mimeMessage, true);
+            messageHelper.setFrom(nickname + "<" + from + ">");
+            messageHelper.setTo(userEmail);
+            messageHelper.setSubject(subject);
+            messageHelper.setText(EmailUtils.emailContentTemplate("templates/EmailCodeTemplate.html", param),true);
+            javaMailSender.send(mimeMessage);
+        } catch (MessagingException e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "发送邮件失败");
+        }
+    }
+
+    /**
+     * 发送注册成功邮件
+     * @param userEmail
+     * @param subject
+     * @param userAccount
+     * @param password
+     */
+    @Override
+    @Async("threadPoolExecutor")
+    public void sendEmailAsRegisterSuccess(String userEmail, String subject, String userAccount, String password) {
+        HashMap<String, Object> param = new HashMap<>();
+        param.put("account", userAccount);
+        param.put("password", password);
+        try {
+            MimeMessage mimeMessage = javaMailSender.createMimeMessage();
+            MimeMessageHelper messageHelper = new MimeMessageHelper(mimeMessage, true);
+            messageHelper.setFrom(nickname + "<" + from + ">");
+            messageHelper.setTo(userEmail);
+            messageHelper.setSubject(subject);
+            messageHelper.setText(EmailUtils.emailContentTemplate("templates/EmailRegisterSuccessTemplate.html", param), true);
+            javaMailSender.send(mimeMessage);
+        } catch (MessagingException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }
 
 

@@ -2,6 +2,7 @@ package com.jianzhao.picturebackend.mapper;
 
 import com.jianzhao.picturebackend.model.entity.User;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Delete;
 
 /**
 * @author 86135
@@ -11,6 +12,8 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 */
 public interface UserMapper extends BaseMapper<User> {
 
+    @Delete("delete from user where isDelete = 1")
+    Integer deleteUser();
 }
 
 

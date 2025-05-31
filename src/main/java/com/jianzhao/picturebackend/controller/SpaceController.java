@@ -175,10 +175,10 @@ public class SpaceController {
         //查询数据库
         Space space = spaceService.getById(id);
         //只有创建者可以获取
-        Long spaceUserId = space.getUserId();
+        //Long spaceUserId = space.getUserId();
         User loginUser = userService.getLoginUser(request);
-        Long userId = loginUser.getId();
-        ThrowUtils.throwIf(!spaceUserId.equals(userId),ErrorCode.NO_AUTH_ERROR);
+        //Long userId = loginUser.getId();
+        //ThrowUtils.throwIf(!spaceUserId.equals(userId),ErrorCode.NO_AUTH_ERROR);
         //构建SpaceVO对象
         SpaceVO spaceVO = spaceService.getSpaceVO(space,request);
 

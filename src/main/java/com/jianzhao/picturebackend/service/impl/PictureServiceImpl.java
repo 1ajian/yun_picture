@@ -56,7 +56,9 @@ import java.awt.*;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -496,17 +498,20 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
      * @param loginUser
      * @return
      */
-    /*@Override
-    public Integer uploadPictureByBatch(PictureUploadByBatchRequest pictureUploadByBatchRequest, User loginUser) {
+    //@Override
+    public Integer uploadPictureByBatchBing(PictureUploadByBatchRequest pictureUploadByBatchRequest, User loginUser) {
         //1.格式化数量
         Integer count = pictureUploadByBatchRequest.getCount();
         ThrowUtils.throwIf(count > 30,ErrorCode.PARAMS_ERROR,"最多30张图片");
 
         //对图片名前缀做判断并处理
-        String namePrefix = pictureUploadByBatchRequest.getNamePrefix();
+        /*String namePrefix = pictureUploadByBatchRequest.getNamePrefix();
         if (StrUtil.isBlank(namePrefix)) {
             namePrefix = pictureUploadByBatchRequest.getSearchText();
-        }
+        }*/
+
+        //优化:namePrefix改为图片
+        String namePrefix = "图片";
 
         //2.拼接要抓取的地址(使用bing抓)
         String begin = String.valueOf(RandomUtil.randomInt(1, 200));
@@ -537,8 +542,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         //根据 标签的属性获取url
         for (Element imgElement : imgElements) {
             //此处获取非原图
-            //String fileUrl = imgElement.attr("src");
-            *//*if (StrUtil.isBlank(fileUrl)) {
+            String fileUrl = imgElement.attr("src");
+            if (StrUtil.isBlank(fileUrl)) {
                 log.info("当前图链接为空,已跳过：{}",fileUrl);
                 continue;
             }
@@ -546,11 +551,11 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             int questionMarkIndex = fileUrl.indexOf("?");
             if (questionMarkIndex > -1) {
                 fileUrl = fileUrl.substring(0,questionMarkIndex);
-            }*//*
+            }
 
             //优化获取原图
             String dataM = imgElement.attr("m");
-            String fileUrl = null;
+            fileUrl = null;
             try {
                 JSONObject jsonObject = JSONUtil.parseObj(dataM);
                 //获取murl字段(原图片url)
@@ -592,22 +597,30 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         }
 
         return uploadCount;
-    }*/
+    }
 
-    @Override
+    /**
+     * 百度抓取图片
+     * @param pictureUploadByBatchRequest
+     * @param loginUser
+     * @return
+     */
+    /*@Override
     public Integer uploadPictureByBatch(PictureUploadByBatchRequest pictureUploadByBatchRequest, User loginUser) {
         //1.格式化数量
         Integer count = pictureUploadByBatchRequest.getCount();
         ThrowUtils.throwIf(count > 30,ErrorCode.PARAMS_ERROR,"最多30张图片");
 
         //对图片名前缀做判断并处理
-        String namePrefix = pictureUploadByBatchRequest.getNamePrefix();
+        *//*String namePrefix = pictureUploadByBatchRequest.getNamePrefix();
         if (StrUtil.isBlank(namePrefix)) {
             namePrefix = pictureUploadByBatchRequest.getSearchText();
-        }
+        }*//*
+
+        String namePrefix = "图片_";
 
         //2.拼接要抓取的地址(使用百度)
-        int begin = RandomUtil.randomInt(1,100) + RandomUtil.randomInt(1,100) * 5;
+        int begin = RandomUtil.randomInt(-4,100) + RandomUtil.randomInt(1,100) * 5;
         List<String> urls = batchCaptureImagesFromBaidu.searchImages(pictureUploadByBatchRequest.getSearchText(), count, begin);
 
         //上传的图片数量
@@ -624,7 +637,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
             //对上传对象设置图片名前缀
             if (StrUtil.isNotBlank(namePrefix)) {
-                pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
+                pictureUploadRequest.setPicName(namePrefix + (++uploadCount));
             }
 
             //上传图片
@@ -644,6 +657,54 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         }
 
         return uploadCount;
+    }*/
+
+    @Override
+    public Integer uploadPictureByBatch(PictureUploadByBatchRequest pictureUploadByBatchRequest, User loginUser) {
+        //1.格式化数量
+        Integer count = pictureUploadByBatchRequest.getCount();
+        ThrowUtils.throwIf(count > 30,ErrorCode.PARAMS_ERROR,"最多30张图片");
+
+        //对图片名前缀做判断并处理
+        String namePrefix = "图片_";
+
+        if(StrUtil.isNotBlank(pictureUploadByBatchRequest.getNamePrefix())) {
+            namePrefix = pictureUploadByBatchRequest.getNamePrefix();
+        } else if (StrUtil.isNotBlank(pictureUploadByBatchRequest.getSearchText())) {
+            namePrefix = pictureUploadByBatchRequest.getSearchText();
+        }
+
+        //2.拼接要抓取的地址(使用百度)
+        int begin = RandomUtil.randomInt(-4,100) + RandomUtil.randomInt(1,100) * 5;
+        List<String> urls = batchCaptureImagesFromBaidu.searchImages(pictureUploadByBatchRequest.getSearchText(), count, begin);
+
+        //上传的图片数量
+        AtomicInteger uploadCount = new AtomicInteger();
+
+        String finalNamePrefix = namePrefix;
+
+        List<CompletableFuture<Void>> futures = urls.stream().filter(StrUtil::isNotBlank)
+                .map(url -> CompletableFuture.runAsync(() -> {
+                    try {
+                        PictureUploadRequest request = new PictureUploadRequest();
+                        request.setPicName(finalNamePrefix + (uploadCount.incrementAndGet()));
+
+                        PictureVO pictureVO = this.uploadPicture(url, request, loginUser);
+                        log.info("图片上传成功,id = {}", pictureVO.getId());
+                    } catch (Exception e) {
+                        log.error("图片上传失败", e);
+                    }
+                }, threadPoolExecutor)).collect(Collectors.toList());
+        //等待所有线程完成
+        try {
+            CompletableFuture.allOf(futures.toArray( new CompletableFuture[0])).join();
+        } catch (Exception e) {
+            log.error("图片上传失败", e);
+        } finally {
+            threadPoolExecutor.shutdown();
+        }
+
+        return uploadCount.get();
     }
 
     /**
@@ -794,10 +855,10 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         ThrowUtils.throwIf(spaceId == null,ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(picColor == null, ErrorCode.PARAMS_ERROR);
         //校验空间权限
-        Space space = spaceService.getById(spaceId);
+        /*Space space = spaceService.getById(spaceId);
         if (!space.getUserId().equals(loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
-        }
+        }*/
         //查询该空间下的所有图片（必须要有主色调）
         List<Picture> pictureList = this.lambdaQuery().eq(Picture::getSpaceId, spaceId).isNotNull(Picture::getPicColor).list();
         //如果没有图片,直接返回空列表
@@ -891,6 +952,12 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
     }*/
 
+
+    /**
+     * 批量编辑图片
+     * @param pictureEditByBatchRequest
+     * @param loginUser
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void editPictureByBatch(PictureEditByBatchRequest pictureEditByBatchRequest, User loginUser) {
@@ -980,6 +1047,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         //验证空间权限
         Space space = spaceService.getById(spaceId);
         ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR,"空间不存在");
+        //只允许创建者修改
         if (!space.getUserId().equals(loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
@@ -1003,10 +1071,10 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         Picture picture = this.getById(pictureId);
         Long spaceId = picture.getSpaceId();
 
-        if (spaceId != null) {
+        /*if (spaceId != null) {
             //需要校验用户的权限
             validateUserAuthToSpace(loginUser, spaceId);
-        }
+        }*/
 
         //构建请求参数
         CreateOutPaintingTaskRequest createOutPaintingTaskRequest = new CreateOutPaintingTaskRequest();
