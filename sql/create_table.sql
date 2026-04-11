@@ -27,6 +27,9 @@ ALTER TABLE user
     ADD COLUMN vipCode varchar(128) NULL COMMENT '会员兑换码',
     ADD COLUMN vipNumber bigint NULL COMMENT '会员编号';
 
+ALTER TABLE user
+    ADD COLUMN AIAvailableCount bigint DEFAULT 1 COMMENT '文生图可用次数';
+
 # 给我用户表添加邮箱字段和手机号码字段，并给他们各自设置索引，并添加邮箱是唯一索引，手机号码是唯一索引
 ALTER TABLE user
     ADD COLUMN email varchar(64) NULL COMMENT '邮箱',
